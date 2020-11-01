@@ -1,0 +1,104 @@
+version: "3.5"
+services:
+  #redis:
+   # image: "redis:5.0"
+    #environment:
+     # - DIR=${DIR}
+    #ports:
+     # - 6375:6379
+    #volumes:
+     # - "${DIR}/config/redis_conf:/conf"
+     # - "${DIR}/datadir/redis:/data/datadir"
+     # - "${DIR}/log/redis:/data/log"
+    #restart: unless-stopped
+  postgres:
+    build: "Containers/postgres"
+    image: "postgres:9.5"
+    container_name: "cerebra-postgres"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - 5435:5432
+    volumes:
+      - "${DIR}/datadir/postgres:/var/lib/postgresql/data"
+    restart: unless-stopped
+
+  zookeeper1:
+    image: zookeeper:3.5
+    restart: unless-stopped
+    ports:
+      - "2182:2181"
+    volumes:
+      - "${DIR}/config/zookeeper_conf/:/conf"
+      - "${DIR}/log/zookeeper/:/logs"
+      - "${DIR}/datadir/zookeeper/datalog:/datalog"
+      - "${DIR}/datadir/zookeeper/data:/data"
+    environment:
+      - ZOO_LOG4J_PROP="INFO,ROLLINGFILE"
+  #kafka:
+    #image: kafka:2.4
+    #stdin_open: true
+    #tty: true
+    #depends_on:
+      #- zookeeper1
+    #ports:
+      #- "9093:9093"
+    #volumes:
+      #- "${DIR}/config/kafka_conf/:/config"
+      #- "${DIR}/log/kafka/:/log"
+      #- "${DIR}/datadir/kafka/:/data"
+    #environment:
+      #- "zookeeper_server=zookeeper1:2181"
+      #- "server_ip=10.2.1.7:9093"
+    #restart: unless-stopped
+  # opentsdb:
+    # image: registry.gitlab.com/bharath_rs/dockertest/opentsdb:2.3.1
+    # ports:
+      # - 4242:4242
+    # volumes:
+      # - "/datadrive/opentsdb/hbase/conf:/opt/hbase/conf"
+      # - "/datadrive/opentsdb/conf:/etc/opentsdb"
+      # - "/datadrive/opentsdb/data:/data"
+    # restart: unless-stopped
+  hadoop-master:
+    build: "Containers/hadoop"
+    image: "hadoop:2.6"
+    container_name: "cerebra-hadoop-master"
+    env_file:
+      - .env
+    volumes:
+      - "${DIR}/config/hadoop:/config/hadoop"
+      - "${DIR}/log/hadoop:/logs/hadoop"
+      - "${DIR}/datadir/hadoop:/data/hadoop"
+    restart: unless-stopped
+    networks:
+      - cerebra_network
+
+  sloshing_risk:
+      build: "Containers/SloshingRisk"
+      image: "cerebra-sloshing-image"
+      container_name: "cerebra-sloshing"
+      restart: unless-stopped
+      volumes:
+        - "/datadrive2/application/SloshingFinal:/executables/sloshing"
+      deploy:
+        resources:
+          limits:
+            memory: 1G
+
+  opc-listener:
+    build: "Containers/opc-listener"
+    image: "cerebra-opc-listener-image:1.0"
+    container_name: "cerebra-opc-listener"
+    restart: unless-stopped
+    volumes:
+      - "/datadrive2/application/opc-listener:/executables/opc-listener"
+
+networks:
+  cerebra_network:
+    name : cerebraNetwork
+    #Using the default bridge network
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: cerebra-nic
